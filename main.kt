@@ -24,6 +24,8 @@ fun checkAndAssign() {
 }
 
 fun blending(image: BufferedImage, watermarkImage: BufferedImage) {
+    if (image.transparency == 3) println("Do you want to use the watermark's Alpha channel?")
+    val alpha = if (readln().lowercase() == "yes") true else false
     println("Input the watermark transparency percentage (Integer 0-100):")
     var percent = 0
     try {
@@ -43,8 +45,8 @@ fun blending(image: BufferedImage, watermarkImage: BufferedImage) {
     val output: BufferedImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_ARGB)
     for (x in 0 until image.width) {
         for (y in 0 until image.height) {
-            val i = Color(image.getRGB(x, y))
-            val w = Color(watermarkImage.getRGB(x, y))
+            val i = Color(image.getRGB(x, y), alpha)
+            val w = Color(watermarkImage.getRGB(x, y), alpha)
             val color = Color(
                 (percent * w.red + (100 - percent) * i.red) / 100,
                 (percent * w.green + (100 - percent) * i.green) / 100,
