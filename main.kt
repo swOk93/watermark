@@ -31,13 +31,18 @@ fun blending(image: BufferedImage, watermarkImage: BufferedImage) {
         println("Do you want to use the watermark's Alpha channel?")
         readln().lowercase() == "yes"
     } else false
-    println("Do you want to set a transparency color?")
     var transpColor = listOf<Int>()
-    if (readln() == "yes") {
-        println("Input a transparency color ([Red] [Green] [Blue]):")
-        transpColor = readln().split(' ').map {if (it.toIntOrNull() != 0) it.toInt() else 0.also {transpColorInvalid()} }
+    if (watermarkImage.transparency != 3) {
+        println("Do you want to set a transparency color?")
+        if (readln() == "yes") {
+            println("Input a transparency color ([Red] [Green] [Blue]):")
+            transpColor = readln().split(' ').map {
+                if (it.toIntOrNull() != null) it.toInt()
+                else if (it.toIntOrNull()!! < 0) 0.also { transpColorInvalid() }
+                else 0.also { transpColorInvalid() } }
+            if (transpColor.size != 3) transpColorInvalid()
+        }
     }
-    if (transpColor.size != 3) transpColorInvalid()
     println("Input the watermark transparency percentage (Integer 0-100):")
     val percent: Int
     try {
@@ -59,19 +64,19 @@ fun blending(image: BufferedImage, watermarkImage: BufferedImage) {
         for (y in 0 until image.height) {
             var i = Color(image.getRGB(x, y), alpha)
             var w = Color(watermarkImage.getRGB(x, y), alpha)
-            if (transpColor.size == 3) if (w.red == transpColor[0] && w.green == transpColor[1] && w.blue == transpColor[2]) output.setRGB(x, y, i.rgb)
-            else {
-                val color = Color(
-                (percent * w.red + (100 - percent) * i.red) / 100,
-                (percent * w.green + (100 - percent) * i.green) / 100,
-                (percent * w.blue + (100 - percent) * i.blue) / 100
+            val color = Color(
+                    (percent * w.red + (100 - percent) * i.red) / 100,
+                    (percent * w.green + (100 - percent) * i.green) / 100,
+                    (percent * w.blue + (100 - percent) * i.blue) / 100
                 )
                 if (alpha) {
-                    if (w.alpha == 0) output.setRGB(x, y, Color(image.getRGB(x, y)).rgb)
+                    if (w.alpha == 0) output.setRGB(x, y, i.rgb)
                     else output.setRGB(x, y, color.rgb)
                 } else {
                     output.setRGB(x, y, color.rgb)
-                }
+            }
+            if (transpColor.size == 3) {
+                if (w.red == transpColor[0] && w.green == transpColor[1] && w.blue == transpColor[2]) output.setRGB(x, y, i.rgb)
             }
         }
     }
