@@ -24,34 +24,13 @@ fun checkAndAssign() {
     blending(image, watermarkImage)
 }
 
-fun transpColorInvalid() = println("The transparency color input is invalid.").also { exitProcess(-1) }
-
 fun blending(image: BufferedImage, watermarkImage: BufferedImage) {
     val alpha = if (watermarkImage.transparency == 3) {
         println("Do you want to use the watermark's Alpha channel?")
         readln().lowercase() == "yes"
     } else false
-    var transpColor = listOf<Int>()
-    if (watermarkImage.transparency != 3) {
-        println("Do you want to set a transparency color?")
-        if (readln() == "yes") {
-            println("Input a transparency color ([Red] [Green] [Blue]):")
-            transpColor = readln().split(' ').map {
-                if (it.toIntOrNull() != null) it.toInt()
-                else if (it.toIntOrNull()!! < 0) 0.also { transpColorInvalid() }
-                else 0.also { transpColorInvalid() } }
-            if (transpColor.size != 3) transpColorInvalid()
-        }
-    }
-    println("Input the watermark transparency percentage (Integer 0-100):")
-    val percent: Int
-    try {
-        percent = readln().toInt()
-    } catch (e: NumberFormatException) {
-        println("The transparency percentage isn't an integer number.")
-        return
-    }
-    if (percent !in 0..100) println("The transparency percentage is out of range.").also { return }
+    val transpColor = if (watermarkImage.transparency != 3) getTranspColor() else listOf()
+    val percent = getPercent()
     println("Input the output image filename (jpg or png extension):")
     val outputName = readln()
     if (!(outputName.substring(outputName.length - 4) != ".png").xor(outputName.substring(outputName.length - 4) != ".jpg")) {
@@ -62,8 +41,8 @@ fun blending(image: BufferedImage, watermarkImage: BufferedImage) {
     val output = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_ARGB)
     for (x in 0 until image.width) {
         for (y in 0 until image.height) {
-            var i = Color(image.getRGB(x, y), alpha)
-            var w = Color(watermarkImage.getRGB(x, y), alpha)
+            val i = Color(image.getRGB(x, y), alpha)
+            val w = Color(watermarkImage.getRGB(x, y), alpha)
             val color = Color(
                     (percent * w.red + (100 - percent) * i.red) / 100,
                     (percent * w.green + (100 - percent) * i.green) / 100,
@@ -82,6 +61,32 @@ fun blending(image: BufferedImage, watermarkImage: BufferedImage) {
     }
     ImageIO.write(output, outputName.substring(outputName.length - 3), outputFile)
     println("The watermarked image ${outputFile.path} has been created.")
+}
+
+fun getPercent(): Int {
+    println("Input the watermark transparency percentage (Integer 0-100):")
+    val input = readln()
+    val percent = if (Regex("\\d{1,3}").matches(input)) {
+        input.toInt().also { if (it !in 0..100) {
+            println("The transparency percentage is out of range.").also { exitProcess(-1) }
+        } }
+    } else exitProcess(-1)
+    return percent
+}
+
+fun transpColorInvalid() = println("The transparency color input is invalid.").also { exitProcess(-1) }
+
+fun getTranspColor(): List<Int> {
+    println("Do you want to set a transparency color?")
+    var transpColor = listOf<Int>()
+    if (readln() == "yes") {
+        println("Input a transparency color ([Red] [Green] [Blue]):")
+        transpColor = readln().split(' ').map {
+            if (it.toIntOrNull() != null && it.toIntOrNull() in 0..255) it.toInt()
+            else 0.also { transpColorInvalid() } }
+        if (transpColor.size != 3) transpColorInvalid()
+    }
+    return transpColor
 }
 
 fun check(name: String, image: BufferedImage): Boolean {
