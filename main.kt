@@ -19,16 +19,41 @@ class InputImage(type: String) {
     private val imageFile: File
     val image: BufferedImage
     init {
-        println("Input the ${if (type == "watermark") "watermark image" else type} filename:")
-        fileName = readln()
-        imageFile = fileCreator(fileName) // create image File
-        if (imageFile.exists()) {
-            image = ImageIO.read(imageFile)
-            if (image.colorModel.numColorComponents != 3) println("The number of $type color components isn't 3.").also { exitProcess(0) }
-            if (image.colorModel.pixelSize != 24 && image.colorModel.pixelSize != 32) println("The $type isn't 24 or 32-bit.").also { exitProcess(0) }
-        } else {
-            print("The file $fileName doesn't exist.")
+        try {
+            println("Input the ${if (type == "watermark") "watermark image" else type} filename:")
+            fileName = readln()
+            imageFile = fileCreator(fileName) // create image File
+            if (imageFile.exists()) {
+                image = ImageIO.read(imageFile)
+                if (image.colorModel.numColorComponents != 3) println("The number of $type color components isn't 3.").also { exitProcess(0) }
+                if (image.colorModel.pixelSize != 24 && image.colorModel.pixelSize != 32) println("The $type isn't 24 or 32-bit.").also { exitProcess(0) }
+            } else {
+                print("The file $fileName doesn't exist.")
+                exitProcess(0)
+            }
+        }
+        catch (e: Exception) {
+            println("An error occurred during initialization: ${e.message}")
+            e.printStackTrace()
             exitProcess(0)
+        }
+    }
+}
+
+object Images {
+    val image: BufferedImage = InputImage("image").image
+    val watermark: BufferedImage = InputImage("watermark").image
+    init {
+        if (image.width < watermark.width && image.height < watermark.height) {
+            print("The watermark's dimensions are larger").also { exitProcess(0) }
+        }
+        if (watermark.transparency == 3) {
+            println("Do you want to use the watermark's Alpha channel?")
+            Blender.alpha = readln().lowercase() == "yes"
+        } else {
+            println("Do you want to set a transparency color?")
+            Blender.transparency = readln().lowercase() == "yes"
+            if (Blender.transparency) Blender.setTransparencyColor()
         }
     }
 }
@@ -36,7 +61,28 @@ class InputImage(type: String) {
 object OutputImage {
     private val outputFileName: String
     private val outputFileExtension: String
+    val positionMethod: String
+    val diffX: Int
+    val diffY: Int
     init {
+        println("Choose the position method (single, grid):")
+        positionMethod = readln().also { if (it != "single" && it != "grid")
+            println("The position method input is invalid.").also {  exitProcess(0) } }
+        val diffXY: List<Int>
+        val (maxDiffX, maxDiffY) = listOf(
+            (Images.image.width - Images.watermark.width), (Images.image.height - Images.watermark.height))
+        if (positionMethod == "single") {
+            println("Input the watermark position ([x 0-$maxDiffX] [y 0-$maxDiffY]):")
+            val input = readln()
+            if (Regex("\\d{1,3} \\d{1,3}").matches(input)) {
+                diffXY = input.split(" ").map { it.toInt() }
+            } else println("The position input is invalid.").also {  exitProcess(0) }
+            if (diffXY[0] > maxDiffX || diffXY[1] > maxDiffY) {
+                println("The position input is invalid.").also {  exitProcess(0) }
+            }
+        } else diffXY = listOf(0, 0)
+        diffX = diffXY[0]
+        diffY = diffXY[1]
         println("Input the output image filename (jpg or png extension):")
         outputFileName = readln()
         outputFileExtension = outputFileName.substringAfter(".")
@@ -63,8 +109,7 @@ object Blender {
         val input = readln()
         if (Regex("\\d{1,3} \\d{1,3} \\d{1,3}").matches(input)) {
             val (red, green, blue) = input.split(" ").map { it.toInt().also {
-                if (it !in 0..255) print("The transparency color input is invalid.").also {exitProcess(0)}
-            } }
+                if (it !in 0..255) print("The transparency color input is invalid.").also {exitProcess(0)} } }
             transparencyColor = Color(red, green, blue)
         } else print("The transparency color input is invalid.").also { exitProcess(0) }
     }
@@ -81,11 +126,18 @@ object Blender {
 
     fun blendImage(image: BufferedImage, watermark: BufferedImage): BufferedImage {
         val outputImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_RGB)
-
+//        val (diffX, diffY) = OutputImage.assignPosition(image, watermark)
         for (x in 0 until image.width) {
             for (y in 0 until image.height) {
                 val i = Color(image.getRGB(x, y))
-                val w = Color(watermark.getRGB(x, y), true)
+                var w = Color(watermark.getRGB(x, y))
+                if (OutputImage.positionMethod == "grid") {
+                    val (a, b) = listOf((x % Images.watermark.width), (y % Images.watermark.height))
+                    w = Color(watermark.getRGB(a, b), true)
+                } else if (OutputImage.positionMethod == "single") {
+                    val (a, b) = listOf((x + OutputImage.diffX), (y % OutputImage.diffY))
+                    w = Color(watermark.getRGB(a, b), true)
+                }
                 var color = Color(i.red, i.green, i.blue)
                 if (alpha && w.alpha == 0) {
                     outputImage.setRGB(x, y, color.rgb)
@@ -109,21 +161,8 @@ object Blender {
 }
 
 fun main() {
-    val input = InputImage("image")
-    val watermark = InputImage("watermark")
-    if (input.image.width < watermark.image.width && input.image.height < watermark.image.height) {
-        print("The watermark's dimensions are larger").also { exitProcess(0) }
-    }
-    if (watermark.image.transparency == 3) {
-        println("Do you want to use the watermark's Alpha channel?")
-        Blender.alpha = readln().lowercase() == "yes"
-    } else {
-        println("Do you want to set a transparency color?")
-        Blender.transparency = readln().lowercase() == "yes"
-        if (Blender.transparency) Blender.setTransparencyColor()
-    }
+    Images
     Blender.setTransparencyPercentage()
-
     val output = OutputImage
-    output.createOutput(input.image, watermark.image)
+    output.createOutput(Images.image, Images.watermark)
 }
