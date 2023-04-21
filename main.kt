@@ -44,8 +44,8 @@ object Images {
     val image: BufferedImage = InputImage("image").image
     val watermark: BufferedImage = InputImage("watermark").image
     init {
-        if (image.width < watermark.width && image.height < watermark.height) {
-            print("The watermark's dimensions are larger").also { exitProcess(0) }
+        if (image.width < watermark.width || image.height < watermark.height) {
+            print("The watermark's dimensions are larger.").also { exitProcess(0) }
         }
         if (watermark.transparency == 3) {
             println("Do you want to use the watermark's Alpha channel?")
@@ -55,6 +55,7 @@ object Images {
             Blender.transparency = readln().lowercase() == "yes"
             if (Blender.transparency) Blender.setTransparencyColor()
         }
+        Blender.setTransparencyPercentage()
     }
 }
 
@@ -74,11 +75,11 @@ object OutputImage {
         if (positionMethod == "single") {
             println("Input the watermark position ([x 0-$maxDiffX] [y 0-$maxDiffY]):")
             val input = readln()
-            if (Regex("\\d{1,3} \\d{1,3}").matches(input)) {
+            if (Regex("-?\\d{1,3} -?\\d{1,3}").matches(input)) {
                 diffXY = input.split(" ").map { it.toInt() }
             } else println("The position input is invalid.").also {  exitProcess(0) }
-            if (diffXY[0] > maxDiffX || diffXY[1] > maxDiffY) {
-                println("The position input is invalid.").also {  exitProcess(0) }
+            if (diffXY[0] !in 0..maxDiffX || diffXY[1] !in 0..maxDiffY) {
+                println("The position input is out of range.").also {  exitProcess(0) }
             }
         } else diffXY = listOf(0, 0)
         diffX = diffXY[0]
@@ -126,20 +127,25 @@ object Blender {
 
     fun blendImage(image: BufferedImage, watermark: BufferedImage): BufferedImage {
         val outputImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_RGB)
-//        val (diffX, diffY) = OutputImage.assignPosition(image, watermark)
         for (x in 0 until image.width) {
             for (y in 0 until image.height) {
                 val i = Color(image.getRGB(x, y))
-                var w = Color(watermark.getRGB(x, y))
+                var w = Color(watermark.getRGB(0, 0))
+                var color = Color(i.red, i.green, i.blue)
                 if (OutputImage.positionMethod == "grid") {
                     val (a, b) = listOf((x % Images.watermark.width), (y % Images.watermark.height))
                     w = Color(watermark.getRGB(a, b), true)
                 } else if (OutputImage.positionMethod == "single") {
-                    val (a, b) = listOf((x + OutputImage.diffX), (y % OutputImage.diffY))
-                    w = Color(watermark.getRGB(a, b), true)
+                    if (x in OutputImage.diffX until OutputImage.diffX + watermark.width &&
+                        y in OutputImage.diffY until OutputImage.diffY + watermark.height) {
+                        val (a, b) = listOf((x - OutputImage.diffX), (y - OutputImage.diffY))
+                        w = Color(watermark.getRGB(a, b), true)
+                    } else {
+                        outputImage.setRGB(x, y, color.rgb)
+                        continue
+                    }
                 }
-                var color = Color(i.red, i.green, i.blue)
-                if (alpha && w.alpha == 0) {
+                if ((alpha && w.alpha == 0)) {
                     outputImage.setRGB(x, y, color.rgb)
                 } else if (transparency &&
                     w.red == transparencyColor.red &&
@@ -162,7 +168,5 @@ object Blender {
 
 fun main() {
     Images
-    Blender.setTransparencyPercentage()
-    val output = OutputImage
-    output.createOutput(Images.image, Images.watermark)
+    OutputImage.createOutput(Images.image, Images.watermark)
 }
