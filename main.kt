@@ -126,34 +126,39 @@ object Blender {
     }
 
     fun blendImage(image: BufferedImage, watermark: BufferedImage): BufferedImage {
+        // Create an output image of the same size and type as the original image
         val outputImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_RGB)
-        for (x in 0 until image.width) {
+        for (x in 0 until image.width) { // Iterate through each pixel of the image
             for (y in 0 until image.height) {
-                val i = Color(image.getRGB(x, y))
-                var w = Color(watermark.getRGB(0, 0))
-                var color = Color(i.red, i.green, i.blue)
-                if (OutputImage.positionMethod == "grid") {
+                val i = Color(image.getRGB(x, y))  // Get the color of the pixel in the original image
+                var w = Color(watermark.getRGB(0, 0)) // Initialize a placeholder for the watermark pixel color (more on this later)
+                var color = Color(i.red, i.green, i.blue) // Create a placeholder for the final blended color
+                if (OutputImage.positionMethod == "grid") { 
+                    // Calculate the position within the watermark for the 'grid' method 
                     val (a, b) = listOf((x % Images.watermark.width), (y % Images.watermark.height))
-                    w = Color(watermark.getRGB(a, b), true)
+                    w = Color(watermark.getRGB(a, b), true) // Retrieve watermark pixel at calculated position
                 } else if (OutputImage.positionMethod == "single") {
+                    // Check if the pixel is within the designated watermark area 
                     if (x in OutputImage.diffX until OutputImage.diffX + watermark.width &&
                         y in OutputImage.diffY until OutputImage.diffY + watermark.height) {
+                        // Calculate the position within the watermark for the 'single' method
                         val (a, b) = listOf((x - OutputImage.diffX), (y - OutputImage.diffY))
-                        w = Color(watermark.getRGB(a, b), true)
+                        w = Color(watermark.getRGB(a, b), true) // Retrieve watermark pixel at calculated position
                     } else {
-                        outputImage.setRGB(x, y, color.rgb)
-                        continue
+                        outputImage.setRGB(x, y, color.rgb) // If outside the watermark area, use original image pixel directly
+                        continue // Skip to the next pixel
                     }
                 }
+                // Check if transparency is enabled and the watermark pixel is not transparent
                 if ((alpha && w.alpha == 0)) {
-                    outputImage.setRGB(x, y, color.rgb)
+                    outputImage.setRGB(x, y, color.rgb) // Use original pixel directly 
                 } else if (transparency &&
                     w.red == transparencyColor.red &&
                     w.green == transparencyColor.green &&
                     w.blue == transparencyColor.blue) {
-                    outputImage.setRGB(x, y, color.rgb)
+                    outputImage.setRGB(x, y, color.rgb) / Use original pixel directly
                 } else {
-                    color = Color(
+                    color = Color( // Calculate the blended color based on transparencyPercentage
                         (transparencyPercentage * w.red + (100 - transparencyPercentage) * i.red) / 100,
                         (transparencyPercentage * w.green + (100 - transparencyPercentage) * i.green) / 100,
                         (transparencyPercentage * w.blue + (100 - transparencyPercentage) * i.blue) / 100)
